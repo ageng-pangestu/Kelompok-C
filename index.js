@@ -38,18 +38,19 @@ app.get("/", home);
 app.get("/register", registerView);
 app.get("/login", loginView);
 app.get("/logout", logout);
-app.get("/collection", collectionView);
 
+app.get("/collection", collectionView);
 app.get("/task/:id", taskView);
 
 app.post("/register", registerUser);
 app.post("/login", loginUser);
 
-app.post("/collection", addCollection);
+app.post("/collection/", addCollection);
 app.post("/delete/:id", deleteCollection);
 app.post("/task/:id", addTask);
-app.post("/deleteTask/:id", deleteTask);
 app.post("/done/:id", doneTask);
+app.post("/undone/:id", unDoneTask);
+app.post("/deleteTask/:id", deleteTask);
 
 async function home(req, res) {
   const isLogin = req.session.isLogin;
@@ -63,12 +64,12 @@ async function home(req, res) {
   res.render("index", { objCollection, isLogin, user });
 }
 
-function loginView(req, res) {
-  res.render("login-form");
-}
-
 function registerView(req, res) {
   res.render("register-form");
+}
+
+function loginView(req, res) {
+  res.render("login-form");
 }
 
 function collectionView(req, res) {
@@ -82,37 +83,63 @@ async function taskView(req, res) {
   const { id } = req.params;
   const isLogin = req.session.isLogin;
   const user = req.session.user;
-  let complete;
+  let isComplete;
+  let isUser;
 
-  const queryCollection = `SELECT *
-  FROM public.collection_tbs
-  WHERE id='${id}'`;
+  //ini ambil data collection dari table collection
+  const queryCollection = `SELECT collection_tbs.id, name, user_id, username
+	FROM collection_tbs
+	LEFT JOIN users_tbs  
+	ON collection_tbs.user_id = users_tbs.id
+	WHERE collection_tbs.id='${id}';`;
   const objCollection = await sequelize.query(queryCollection, { type: QueryTypes.SELECT });
-
   const collection = objCollection[0];
 
+  console.log("Collection id nya nih: " + collection.id);
+
+  //ini ambil seluruh data task berdasarkan collection dari table task
   const queryTask = `SELECT *
 	FROM public.task_tbs
-	WHERE collections_id='${id}'`;
+	WHERE collections_id='${id}'
+  ORDER BY id DESC`;
   const objTask = await sequelize.query(queryTask, { type: QueryTypes.SELECT });
 
+  //ini ambil seluruh data task yang BELUM selesai berdasarkan collection dari table task
   const queryTaskFalse = `SELECT *
 	FROM public.task_tbs
-	WHERE collections_id='${id}' AND is_done=False;`;
+	WHERE collections_id='${id}' AND is_done=False
+  ORDER BY id DESC;`;
   const objTaskFalse = await sequelize.query(queryTaskFalse, { type: QueryTypes.SELECT });
 
+  //ini ambil seluruh data task yang SUDAH selesai berdasarkan collection dari table task
   const queryTaskTrue = `SELECT *
 	FROM public.task_tbs
-	WHERE collections_id='${id}' AND is_done=True;`;
+	WHERE collections_id='${id}' AND is_done=True
+  ORDER BY id DESC;`;
   const objTaskTrue = await sequelize.query(queryTaskTrue, { type: QueryTypes.SELECT });
 
-  if (objTaskTrue.length == objTask.length) {
-    complete = true;
+  //kondisi untuk cek tasknya sudah selesai semua atau belum
+  if (objTask.length == 0) {
+    isComplete = false;
+  } else if (objTaskTrue.length == objTask.length) {
+    isComplete = true;
   } else {
-    complete = false;
+    isComplete = false;
   }
 
-  res.render("task", { collection, objTask, objTaskFalse, objTaskTrue, isLogin, user, complete });
+  //kondisi untuk mencocokan apakah collectionnya punya user yang membuatnya
+  try {
+    if (collection.user_id == user.id) {
+      isUser = true;
+    } else {
+      isUser = false;
+    }
+  } catch (err) {
+    isUser = false;
+    console.log("id user tidak ditemukan");
+  }
+
+  res.render("task", { collection, objTask, objTaskFalse, objTaskTrue, isLogin, user, isComplete, isUser });
 }
 
 async function addCollection(req, res) {
@@ -148,20 +175,6 @@ async function addTask(req, res) {
   res.redirect(`${id}`);
 }
 
-async function deleteTask(req, res) {
-  const { id } = req.params;
-
-  const querySelect = `SELECT * FROM public.task_tbs
-	WHERE id='${id}';`;
-  const objSelect = await sequelize.query(querySelect, { type: QueryTypes.SELECT });
-
-  const query = `DELETE FROM public.task_tbs
-	WHERE id='${id}';`;
-  const obj = await sequelize.query(query, { type: QueryTypes.DELETE });
-
-  res.redirect(`/task/${objSelect[0].collections_id}`);
-}
-
 async function doneTask(req, res) {
   const { id } = req.params;
 
@@ -173,6 +186,35 @@ async function doneTask(req, res) {
 	SET is_done=True
 	WHERE id='${id}';`;
   const obj = await sequelize.query(query, { type: QueryTypes.UPDATE });
+
+  res.redirect(`/task/${objSelect[0].collections_id}`);
+}
+
+async function unDoneTask(req, res) {
+  const { id } = req.params;
+
+  const querySelect = `SELECT * FROM public.task_tbs
+	WHERE id='${id}';`;
+  const objSelect = await sequelize.query(querySelect, { type: QueryTypes.SELECT });
+
+  const query = `UPDATE public.task_tbs
+	SET is_done=False
+	WHERE id='${id}';`;
+  const obj = await sequelize.query(query, { type: QueryTypes.UPDATE });
+
+  res.redirect(`/task/${objSelect[0].collections_id}`);
+}
+
+async function deleteTask(req, res) {
+  const { id } = req.params;
+
+  const querySelect = `SELECT * FROM public.task_tbs
+	WHERE id='${id}';`;
+  const objSelect = await sequelize.query(querySelect, { type: QueryTypes.SELECT });
+
+  const query = `DELETE FROM public.task_tbs
+	WHERE id='${id}';`;
+  const obj = await sequelize.query(query, { type: QueryTypes.DELETE });
 
   res.redirect(`/task/${objSelect[0].collections_id}`);
 }

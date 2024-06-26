@@ -1,0 +1,7 @@
+body {
+  background-color: whitesmoke !important;
+}
+
+.done button i:hover {
+  color: whitesmoke !important;
+}
