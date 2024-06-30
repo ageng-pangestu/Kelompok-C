@@ -9,7 +9,7 @@ function cetakPola(height) {
 
     let symbol = "";
     if (i % 2 == 0) {
-      for (let j = 0; j < height - i; j++) {
+      for (let j = 0; j < i; j++) {
         if (j % 2 === 0) {
           symbol = symbol + "# ";
         } else {
@@ -17,7 +17,7 @@ function cetakPola(height) {
         }
       }
     } else {
-      for (let j = 0; j < height - i; j++) {
+      for (let j = 0; j < i; j++) {
         symbol = symbol + "+ ";
       }
     }
